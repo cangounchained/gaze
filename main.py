@@ -1,4 +1,4 @@
-mport cv2
+import cv2
 import mediapipe as mp
 from gaze_simple import gaze
 import time
