@@ -451,7 +451,11 @@ with tabs[2]:
             if st.button("Train Model"):
                 with st.spinner("Training model..."):
                     # Assuming dataset has features and 'label' column
-                    features = df.drop('label', axis=1)
+                    if 'label' in df.columns:
+                    features = df.drop(columns=['label'])
+                    else:
+                    features = df
+
                     labels = df['label'].map({'ASD': 1, 'Typical': 0})
 
                     classifier = ASDClassifier('rf')
