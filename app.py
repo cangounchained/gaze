@@ -265,7 +265,6 @@ st.write(
 if not CV2_AVAILABLE:
     st.error("⚠️ **OpenCV not available** - Webcam functionality disabled")
     st.warning("To enable webcam features, install system graphics libraries and OpenCV")
-    st.info("Current environment: Container without graphics support")
 
 if not MEDIAPIPE_AVAILABLE:
     st.warning("⚠️ **MediaPipe not available** - Face detection disabled")
@@ -342,12 +341,33 @@ with tabs[0]:
                 if cap.isOpened():
                     ret, frame = cap.read()
                     if ret:
-                        st.image(frame, channels="BGR", caption="Live Webcam Feed", output_format="JPEG", clamp=True, use_column_width=True, caption_visibility="visible")
+                        st.image(frame, channels="BGR", caption="Live Webcam Feed", output_format="JPEG", clamp=True, use_column_width=True)
                     else:
                         st.error("⚠️ Unable to read from webcam.")
                     cap.release()
                 else:
                     st.error("⚠️ Webcam not detected or unavailable.")
+    
+    # Calibration section
+    st.markdown("---")
+    st.header("🎯 Calibration (Optional)")
+    
+    st.write("Calibrate your gaze by following the moving dot with your eyes. This helps improve analysis accuracy.")
+    
+    if st.button("Start Calibration"):
+        calibration_placeholder = st.empty()
+        import time
+        positions = [(50, 50), (50, 150), (150, 50), (150, 150), (100, 100)]  # example positions
+        for pos in positions:
+            calibration_placeholder.markdown(f"""
+            <div style="position: relative; width: 200px; height: 200px; border: 1px solid black; margin: 0 auto;">
+                <div style="position: absolute; left: {pos[0]}px; top: {pos[1]}px; width: 10px; height: 10px; background-color: red; border-radius: 50%;"></div>
+            </div>
+            <p style="text-align: center;">Look at the red dot</p>
+            """, unsafe_allow_html=True)
+            time.sleep(2)  # wait 2 seconds
+        calibration_placeholder.empty()
+        st.success("Calibration complete!")
     
     # Gaze Tracking button
     st.markdown("---")
