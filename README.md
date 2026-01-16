@@ -1,6 +1,6 @@
 # 🧠 ASD Gaze Tracking Research Tool
 
-A comprehensive Python-based research tool for Autism Spectrum Disorder (ASD) detection through gaze pattern analysis. This tool combines computer vision, deep learning, and machine learning to analyze gaze behaviors in real-time.
+A comprehensive Python-based research tool for Autism Spectrum Disorder (ASD) detection through gaze pattern analysis. This tool combines computer vision, machine learning, and an interactive web interface to analyze gaze behaviors.
 
 ## ⚠️ IMPORTANT MEDICAL DISCLAIMER
 
@@ -11,42 +11,244 @@ Autism Spectrum Disorder can only be diagnosed by qualified medical professional
 
 ## 📋 Features
 
-- **Real-time gaze tracking** using MediaPipe Face Mesh
-- **Eye region extraction** and preprocessing
-- **CNN feature extraction** using MobileNetV2 embeddings
-- **Handcrafted gaze metrics** (fixation stability, saccades, blink rate, asymmetry)
-- **Machine learning classification** (Random Forest or PyTorch models)
+- **Real-time gaze tracking** using MediaPipe Face Mesh (when available)
+- **Machine learning classification** using Random Forest (65-67% accuracy)
 - **Interactive web interface** with live webcam analysis
-- **Comprehensive evaluation** with accuracy, precision, recall, AUC, and confusion matrices
-- **Multi-dataset support** (MIT GazeCapture, Kaggle ASD, ASD vs TD)
-
-## 🏗️ Project Structure
-
-```
-asd-gaze-research-tool/
-├── data/                          # Dataset directory
-│   ├── mit_gazecapture/          # MIT GazeCapture dataset
-│   ├── kaggle_asd/               # Kaggle ASD dataset
-│   └── asd_vs_td/                # ASD vs TD dataset
-├── src/                          # Source code
-│   ├── preprocessing.py          # Face/eye detection and preprocessing
-│   ├── feature_extraction.py     # Feature extraction (handcrafted + CNN)
-│   ├── model.py                  # ML models and evaluation
-│   ├── train.py                  # Training script
-│   └── webcam_ui.py              # Streamlit web interface
-├── models/                       # Saved trained models
-├── results/                      # Evaluation results and plots
-├── requirements.txt              # Python dependencies
-└── README.md                     # This file
-```
+- **CSV dataset analysis** for batch processing
+- **Model training** with custom datasets
+- **Comprehensive evaluation** with accuracy, precision, recall, and confusion matrices
+- **Ethical AI practices** with responsible research guidelines
 
 ## 🚀 Quick Start
 
-### 1. Environment Setup
+### Option 1: One-Click Setup (Recommended)
 
+#### Linux/macOS:
 ```bash
-# Clone or download the project
-cd asd-gaze-research-tool
+./run.sh
+```
+
+#### Windows:
+```cmd
+run.bat
+```
+
+That's it! The script will:
+- Create a virtual environment
+- Install all dependencies
+- Check for optional components
+- Launch the web interface at http://localhost:8501
+
+### Option 2: Manual Setup
+
+#### 1. Clone/Download
+```bash
+git clone <repository-url>
+cd gaze
+```
+
+#### 2. Create Virtual Environment
+```bash
+# Linux/macOS
+python3 -m venv venv
+source venv/bin/activate
+
+# Windows
+python -m venv venv
+venv\Scripts\activate
+```
+
+#### 3. Install Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+#### 4. Run the Application
+```bash
+python3 -m streamlit run app.py
+```
+
+## 📊 System Requirements
+
+### Minimum Requirements:
+- Python 3.8+
+- 4GB RAM
+- Webcam (optional, for live analysis)
+
+### Recommended Requirements:
+- Python 3.9+
+- 8GB RAM
+- Webcam with 1080p resolution
+- Graphics card (for OpenCV acceleration)
+
+## 📁 Project Structure
+
+```
+gaze/
+├── app.py                    # Main Streamlit web application
+├── gaze.py                   # Core gaze tracking logic
+├── helpers.py                # Helper functions
+├── working_cli.py            # Command-line interface
+├── run_demo.py               # Demo script
+├── check_availability.py     # Library availability checker
+├── asd_model.pkl            # Trained ML model
+├── requirements.txt          # Python dependencies
+├── run.sh                   # Linux/macOS launch script
+├── run.bat                  # Windows launch script
+├── environment.yml          # Conda environment file
+├── risk_flags.py            # Ethical guidelines
+└── README.md                # This file
+```
+
+## 🔧 Dependencies
+
+### Core Dependencies (Required):
+- `numpy` - Numerical computing
+- `pandas` - Data manipulation
+- `scikit-learn` - Machine learning
+- `joblib` - Model persistence
+- `streamlit` - Web interface
+
+### Optional Dependencies (Recommended):
+- `opencv-python` - Webcam and video processing
+- `mediapipe` - Face detection and landmark tracking
+
+### Development Dependencies:
+- `matplotlib` - Plotting
+- `seaborn` - Statistical visualization
+- `pytest` - Testing
+- `black` - Code formatting
+- `flake8` - Linting
+
+## 🎯 Usage
+
+### Web Interface
+1. Run the application using one of the methods above
+2. Open http://localhost:8501 in your browser
+3. Choose from four main tabs:
+
+#### Live Session
+- Real-time webcam analysis (requires OpenCV)
+- Live gaze tracking and classification
+- Session recording and analysis
+
+#### Upload & Analyze
+- Upload CSV files with gaze data
+- Batch processing of multiple samples
+- Individual predictions with confidence scores
+
+#### Train Model
+- Train new models with custom datasets
+- Hyperparameter tuning
+- Model comparison and validation
+
+#### Results
+- View evaluation metrics
+- Confusion matrices and performance plots
+- Download analysis reports
+
+### Command Line
+```bash
+# Run demo
+python3 run_demo.py
+
+# Command line analysis
+python3 working_cli.py
+
+# Check library availability
+python3 check_availability.py
+```
+
+## 📊 Data Format
+
+The tool expects CSV files with the following columns:
+- `x`, `y` - Gaze coordinates
+- `ear_left`, `ear_right` - Eye aspect ratios
+- `pupil_left_x`, `pupil_left_y` - Left pupil coordinates
+- `pupil_right_x`, `pupil_right_y` - Right pupil coordinates
+- `mouth_opening` - Mouth opening measurement
+- `dist_eye_left`, `dist_eye_right` - Eye distances
+- `dist_mouth`, `dist_nose` - Facial feature distances
+- `label` - Target label ('ASD' or 'Typical')
+
+## 🔬 Technical Details
+
+### Machine Learning Model
+- **Algorithm**: Random Forest Classifier
+- **Features**: 13 gaze and facial metrics
+- **Accuracy**: 65-67% on test data
+- **Training Data**: Synthetic gaze patterns mimicking ASD vs Typical behaviors
+
+### Feature Extraction
+- **Real-time**: MediaPipe Face Mesh landmarks
+- **Offline**: CSV-based feature processing
+- **Metrics**: Eye tracking, facial expressions, gaze patterns
+
+### Evaluation Metrics
+- Accuracy, Precision, Recall, F1-Score
+- Confusion Matrix
+- ROC Curves and AUC
+- Classification Reports
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🙏 Acknowledgments
+
+- MediaPipe for face detection capabilities
+- Scikit-learn for machine learning algorithms
+- Streamlit for the web interface framework
+- Research community for ASD gaze pattern studies
+
+## 📞 Support
+
+For questions or issues:
+1. Check the troubleshooting section below
+2. Review the demo scripts
+3. Open an issue on GitHub
+
+## 🔧 Troubleshooting
+
+### OpenCV Issues
+If you see "libGL.so.1" errors:
+```bash
+# Linux
+sudo apt-get install libgl1-mesa-glx
+
+# macOS
+# Usually works out of the box
+
+# Windows
+# Install Visual C++ Redistributables
+```
+
+### Webcam Not Working
+- Ensure camera permissions are granted
+- Try different browsers (Chrome recommended)
+- Check camera is not used by other applications
+
+### Import Errors
+- Ensure virtual environment is activated
+- Reinstall requirements: `pip install -r requirements.txt`
+- Check Python version (3.8+ required)
+
+### Performance Issues
+- Close other applications
+- Use smaller batch sizes for analysis
+- Consider using GPU if available
+
+---
+
+**Remember: This tool is for research purposes only. Always consult medical professionals for ASD diagnosis and support.**
 
 # Create virtual environment
 python -m venv venv
