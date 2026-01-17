@@ -1,14 +1,11 @@
 import streamlit as st
 import os
 import pandas as pd
-import tempfile
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, classification_report
 import joblib
-import time
 
-# Properly handle optional dependencies
+# Handle optional dependencies
 try:
     import cv2
     CV2_AVAILABLE = True
@@ -158,53 +155,30 @@ with tab1:
     st.markdown("---")
     st.subheader("📷 Webcam Preview")
     
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if st.button("▶️ Start Preview", key="preview_start"):
-            st.session_state.preview_active = True
-    
-    with col2:
-        if st.button("⏹️ Stop Preview", key="preview_stop"):
-            st.session_state.preview_active = False
-    
-    # Webcam preview
-    if st.session_state.get('preview_active', False):
+    if st.button("📸 Show Webcam Frame", key="show_webcam"):
         if not CV2_AVAILABLE:
-            st.error("OpenCV not available")
+            st.error("❌ OpenCV not available")
         else:
-            st.info("Starting webcam...")
+            st.info("Accessing webcam...")
             cap = cv2.VideoCapture(0)
             
             if not cap.isOpened():
-                st.error("❌ Cannot access webcam. Make sure it's connected and not in use.")
+                st.error("❌ Cannot access webcam. Check if connected and not in use.")
             else:
-                frame_placeholder = st.empty()
-                info_placeholder = st.empty()
+                ret, frame = cap.read()
+                cap.release()
                 
-                frame_count = 0
-                while st.session_state.get('preview_active', False) and frame_count < 300:
-                    ret, frame = cap.read()
-                    if not ret:
-                        st.error("Cannot read from webcam")
-                        break
-                    
+                if ret:
                     h, w = frame.shape[:2]
-                    
                     # Draw red dot at center
                     cv2.circle(frame, (w//2, h//2), 15, (0, 0, 255), -1)
                     cv2.circle(frame, (w//2, h//2), 17, (0, 0, 255), 2)
                     
-                    # Display
                     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    frame_placeholder.image(rgb_frame, channels="RGB", width=640)
-                    frame_count += 1
-                    info_placeholder.text(f"Frame: {frame_count} | {w}x{h}")
-                    
-                    time.sleep(0.01)  # Small delay to prevent CPU overload
-                
-                cap.release()
-                st.session_state.preview_active = False
+                    st.image(rgb_frame, channels="RGB", width=640, caption=f"Webcam - {w}x{h}")
+                    st.success("✅ Webcam working!")
+                else:
+                    st.error("❌ Cannot read from webcam")
     
     st.markdown("---")
     st.subheader("🎯 Calibration")
@@ -213,40 +187,37 @@ with tab1:
         if not CV2_AVAILABLE:
             st.error("OpenCV not available")
         else:
-            st.info("Follow the red dot with your eyes")
-            placeholder = st.empty()
+            st.info("5-point calibration sequence")
             
+            # Display all 5 positions
             positions = [
-                (160, 120, "Top-Left"),
-                (480, 120, "Top-Right"),
-                (160, 360, "Bottom-Left"),
-                (480, 360, "Bottom-Right"),
-                (320, 240, "Center")
+                (160, 120, "⬅️ Top-Left"),
+                (480, 120, "➡️ Top-Right"),
+                (160, 360, "⬅️ Bottom-Left"),
+                (480, 360, "➡️ Bottom-Right"),
+                (320, 240, "⭐ Center")
             ]
             
-            for idx, (x, y, label) in enumerate(positions):
-                # Create calibration frame
-                cal_frame = np.ones((480, 640, 3), dtype=np.uint8) * 180
-                cv2.circle(cal_frame, (x, y), 30, (0, 0, 255), -1)
-                cv2.circle(cal_frame, (x, y), 35, (0, 0, 255), 3)
-                
-                placeholder.image(cal_frame, channels="BGR", width=640)
-                st.text(f"{idx+1}/5: {label} - Focus for 2 seconds...")
-                time.sleep(2)
+            cols = st.columns(5)
+            for idx, (col, (x, y, label)) in enumerate(zip(cols, positions)):
+                with col:
+                    # Create calibration frame
+                    cal_frame = np.ones((240, 160, 3), dtype=np.uint8) * 180
+                    cv2.circle(cal_frame, (x//4, y//2), 10, (0, 0, 255), -1)
+                    st.image(cal_frame, channels="BGR", caption=f"{idx+1}/5: {label}", use_column_width=True)
             
-            placeholder.empty()
-            st.success("✅ Calibration complete!")
+            st.success("✅ Calibration complete! Focus on each dot for 2 seconds each.")
     
     st.markdown("---")
     st.subheader("▶️ Start Gaze Tracking")
     
-    if st.button("🔴 Start Tracking", key="start_tracking"):
+    if st.button("🔴 Start Tracking (30 frames)", key="start_tracking"):
         if not user_id.strip():
             st.error("❌ Enter Participant ID first")
         elif not CV2_AVAILABLE or not MEDIAPIPE_AVAILABLE:
             st.error("❌ OpenCV and MediaPipe required")
         else:
-            st.info(f"Starting session for {user_id}...")
+            st.info(f"Starting 30-frame capture for {user_id}...")
             
             try:
                 cap = cv2.VideoCapture(0)
@@ -261,15 +232,16 @@ with tab1:
                         min_detection_confidence=0.5
                     )
                     
-                    video_placeholder = st.empty()
-                    timer_placeholder = st.empty()
-                    status_placeholder = st.empty()
-                    
-                    session_start = time.time()
+                    frames_to_collect = 30
                     frame_count = 0
                     gaze_data = []
+                    frame_images = []
                     
-                    while time.time() - session_start < session_duration:
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+                    
+                    # Collect frames quickly without blocking
+                    for i in range(frames_to_collect):
                         ret, frame = cap.read()
                         if not ret:
                             st.error("Failed to read frame")
@@ -283,7 +255,7 @@ with tab1:
                         if results.multi_face_landmarks:
                             face_detected = True
                             for landmarks in results.multi_face_landmarks:
-                                # Get pupil
+                                # Get pupil landmark
                                 pupil = landmarks.landmark[468]
                                 pupil_x = int(pupil.x * w)
                                 pupil_y = int(pupil.y * h)
@@ -292,49 +264,54 @@ with tab1:
                                 cv2.circle(frame, (pupil_x, pupil_y), 10, (0, 0, 255), -1)
                                 cv2.circle(frame, (pupil_x, pupil_y), 12, (0, 0, 255), 2)
                                 
-                                # Draw line from eye
+                                # Draw line from eye corner to pupil
                                 left_eye = landmarks.landmark[33]
                                 left_eye_x = int(left_eye.x * w)
                                 left_eye_y = int(left_eye.y * h)
                                 cv2.line(frame, (left_eye_x, left_eye_y), (pupil_x, pupil_y), (0, 0, 255), 2)
                                 
-                                # Store gaze data
+                                # Record gaze point
                                 gaze_data.append({
-                                    'frame': frame_count,
+                                    'frame': i,
                                     'x': pupil_x,
                                     'y': pupil_y,
-                                    'timestamp': time.time() - session_start
+                                    'face_detected': True
                                 })
                         
-                        # Display frame
+                        if not face_detected:
+                            gaze_data.append({'frame': i, 'x': 0, 'y': 0, 'face_detected': False})
+                        
+                        # Store frame for display
                         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                        video_placeholder.image(rgb_frame, channels="RGB", width=640)
+                        frame_images.append(rgb_frame)
                         
-                        # Update timer
-                        elapsed = time.time() - session_start
-                        remaining = session_duration - elapsed
-                        timer_placeholder.metric("Time Remaining", f"{remaining:.1f}s")
-                        
-                        # Status
-                        status_text = "✅ Face detected" if face_detected else "❌ No face"
-                        status_placeholder.text(f"{status_text} | Frames: {frame_count}")
-                        
-                        frame_count += 1
-                        time.sleep(0.01)
+                        # Update progress
+                        frame_count = i + 1
+                        progress_bar.progress(frame_count / frames_to_collect)
+                        status_text.text(f"✓ Captured {frame_count}/{frames_to_collect} frames")
                     
                     cap.release()
                     face_mesh.close()
                     
-                    # Save session
+                    # Display collected frames
+                    st.success("✅ Tracking complete!")
+                    
+                    cols = st.columns(5)
+                    for i in range(min(10, len(frame_images))):
+                        col = cols[i % 5]
+                        with col:
+                            st.image(frame_images[i], width=130, caption=f"Frame {i+1}")
+                    
+                    # Save session data
                     st.session_state.last_session = {
                         'user_id': user_id,
                         'duration': session_duration,
                         'frames': frame_count,
                         'gaze_data': gaze_data,
-                        'notes': session_notes
+                        'notes': session_notes,
+                        'frame_images': frame_images
                     }
                     
-                    st.success("✅ Tracking complete!")
                     st.balloons()
                     
             except Exception as e:
@@ -466,16 +443,34 @@ with tab4:
         
         if session['gaze_data']:
             gaze_df = pd.DataFrame(session['gaze_data'])
-            st.write("Gaze Data:")
-            st.dataframe(gaze_df, use_column_width=True)
             
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("Avg X", f"{gaze_df['x'].mean():.0f}px")
-                st.metric("Avg Y", f"{gaze_df['y'].mean():.0f}px")
-            with col2:
-                st.metric("X Range", f"{gaze_df['x'].max() - gaze_df['x'].min():.0f}px")
-                st.metric("Y Range", f"{gaze_df['y'].max() - gaze_df['y'].min():.0f}px")
+            # Filter only detected faces
+            detected = gaze_df[gaze_df['x'] > 0]
+            
+            if len(detected) > 0:
+                st.write("**Gaze Statistics**")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Avg X", f"{detected['x'].mean():.0f}px")
+                    st.metric("Avg Y", f"{detected['y'].mean():.0f}px")
+                with col2:
+                    st.metric("X Range", f"{detected['x'].max() - detected['x'].min():.0f}px")
+                    st.metric("Y Range", f"{detected['y'].max() - detected['y'].min():.0f}px")
+                
+                st.write("Detailed Data:")
+                st.dataframe(gaze_df, use_column_width=True)
+            else:
+                st.warning("⚠️ No faces detected in session")
+        
+        # Show frame gallery
+        if 'frame_images' in session and session['frame_images']:
+            st.markdown("---")
+            st.write("**Frame Gallery**")
+            cols = st.columns(5)
+            for i in range(min(10, len(session['frame_images']))):
+                col = cols[i % 5]
+                with col:
+                    st.image(session['frame_images'][i], width=130, caption=f"Frame {i+1}")
     else:
         st.info("No session data. Run a tracking session first.")
 
