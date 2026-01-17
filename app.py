@@ -554,29 +554,79 @@ with tabs[2]:
         if dataset_file is not None:
             df = pd.read_csv(dataset_file)
             st.dataframe(df.head())
+            
+            # Show available columns for user to select
+            st.subheader("Select Label Column")
+            st.info("Choose which column contains your class labels (ASD/Typical, or any binary labels)")
+            
+            # Auto-detect possible label columns
+            possible_label_cols = []
+            for col in df.columns:
+                # Check if column has object dtype or few unique values
+                if df[col].dtype == 'object' or (df[col].dtype in ['int64', 'float64'] and df[col].nunique() <= 10):
+                    possible_label_cols.append(col)
+            
+            if possible_label_cols:
+                selected_label_col = st.selectbox(
+                    "Select the label column:",
+                    possible_label_cols,
+                    help="This should be your target variable (e.g., ASD/Typical)"
+                )
+            else:
+                selected_label_col = st.selectbox(
+                    "Select the label column:",
+                    df.columns,
+                    help="No obvious label columns found. Select manually."
+                )
 
             if st.button("Train Model"):
-                with st.spinner("Training model..."):
-                    # Check if 'label' column exists
-                    label_col = 'label'
-                    if label_col not in df.columns:
-                        # Try to find a label column by looking for object/categorical columns
-                        for col in df.columns:
-                            if df[col].dtype == 'object':
-                                label_col = col
-                                break
-                    
-                    if label_col not in df.columns:
-                        st.error(f"Label column not found in dataset")
-                    else:
-                        features = df.drop(label_col, axis=1)
-                        labels = df[label_col].map({'ASD': 1, 'Typical': 0})
-
-                        classifier = ASDClassifier('rf')
-                        classifier.train(features, labels)
-                        classifier.save_model("asd_model.pkl")
-
-                        st.success("Model trained and saved!")
+                try:
+                    with st.spinner("Training model..."):
+                        # Validate that label column exists
+                        if selected_label_col not in df.columns:
+                            st.error(f"❌ Column '{selected_label_col}' not found in dataset")
+                        else:
+                            # Get unique values in label column
+                            unique_labels = df[selected_label_col].unique()
+                            st.info(f"Found labels: {unique_labels}")
+                            
+                            # Drop rows with missing values
+                            df_clean = df.dropna(subset=[selected_label_col])
+                            
+                            if len(df_clean) == 0:
+                                st.error("❌ No valid data after removing missing values")
+                            else:
+                                # Prepare features and labels
+                                features = df_clean.drop(columns=[selected_label_col])
+                                labels_raw = df_clean[selected_label_col]
+                                
+                                # Handle label encoding
+                                if labels_raw.dtype == 'object':
+                                    # For string labels, create mapping
+                                    unique_label_values = labels_raw.unique()
+                                    label_mapping = {label: idx for idx, label in enumerate(unique_label_values)}
+                                    st.info(f"Label mapping: {label_mapping}")
+                                    labels = labels_raw.map(label_mapping)
+                                else:
+                                    # For numeric labels, use as is
+                                    labels = labels_raw.astype(int)
+                                
+                                # Check for NaN values after mapping
+                                if labels.isna().any():
+                                    st.warning(f"⚠️ Found {labels.isna().sum()} unmapped labels. Using numeric encoding.")
+                                    labels = labels_raw.astype(int)
+                                
+                                # Train model
+                                classifier = ASDClassifier('rf')
+                                classifier.train(features, labels)
+                                classifier.save_model("asd_model.pkl")
+                                
+                                st.success("✅ Model trained and saved successfully!")
+                                st.info(f"Training complete with {len(features)} samples and {len(features.columns)} features")
+                
+                except Exception as e:
+                    st.error(f"❌ Error training model: {str(e)}")
+                    st.info("Make sure your CSV has numeric feature columns and a label column")
 
 with tabs[3]:
     st.header("Session Results")
