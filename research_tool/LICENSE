@@ -1,0 +1,154 @@
+# RESEARCH USE ONLY LICENSE
+
+## 1. Grant of License
+
+This software (hereinafter "Software") is provided by the authors under the terms and conditions of this Research Use Only License (hereinafter "License").
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this Software to use, copy, and modify it for **research and educational purposes only**, subject to the following conditions:
+
+## 2. Restrictions
+
+The licensee agrees NOT to:
+
+### 2.1 Clinical or Medical Use
+- Use this Software for diagnosis, screening, or assessment of autism spectrum disorder (ASD) in individuals
+- Use this Software for any clinical, medical, or therapeutic application
+- Use this Software as a diagnostic tool or medical device
+- Make any clinical or medical claims based on this Software's output
+
+### 2.2 Commercial Use
+- Use this Software for commercial purposes
+- Sell, rent, lease, or transfer this Software
+- Integrate this Software into any commercial product or service without explicit written permission
+- Use this Software to provide paid services or consulting
+
+### 2.3 Regulatory Compliance
+- This Software is NOT intended to comply with medical device regulations (FDA, CE, etc.)
+- Use of this Software for regulated purposes requires separate approval and validation
+- Any validated clinical version requires independent regulatory approval
+
+## 3. Research Use Definition
+
+"Research Use" means use for:
+- Academic research and publication
+- Method development and validation studies
+- Educational demonstrations and teaching
+- Algorithm testing and comparison
+- Feature extraction and analysis
+- Dataset creation and annotation
+
+All research use must:
+- Include proper citations and attribution
+- Maintain this License with any modifications
+- Include ethical disclaimers in publications and presentations
+- Obtain informed consent from human subjects
+
+## 4. No Warranty
+
+THIS SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+## 5. Liability Disclaimer
+
+IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR:
+- Any direct, indirect, incidental, special, exemplary, or consequential damages
+- Loss of data, revenue, or business
+- Medical errors or harm caused by use of this Software
+- Incorrect diagnosis or misclassification results
+- Any other liability arising from use or inability to use this Software
+
+## 6. Ethical Use Agreement
+
+By using this Software, you agree to:
+
+### 6.1 Research Ethics
+- Follow your institution's Institutional Review Board (IRB) guidelines
+- Obtain informed consent from human subjects
+- Maintain privacy and confidentiality of data
+- Use secure data storage and transmission methods
+- Comply with data protection regulations (GDPR, HIPAA, etc.)
+
+### 6.2 Disclaimer Requirements
+- Include clear disclaimers that this is a research prototype
+- State that it is NOT for diagnostic use
+- Warn that professional evaluation is required
+- Never claim this tool replaces medical professionals
+
+### 6.3 Publication & Sharing
+- Cite this Software in academic publications
+- Share modifications under the same License
+- Make modifications available to the research community
+- Do not redistribute under commercial licenses
+
+## 7. Modification and Distribution
+
+You may modify this Software for research purposes. If you modify it:
+- You must distribute modified versions under this same License
+- You must maintain all copyright notices and disclaimers
+- You must clearly mark modifications
+- You must not misrepresent the original authors
+
+## 8. Termination
+
+This License is effective until terminated. Your rights are automatically terminated if you:
+- Violate any terms of this License
+- Use this Software for clinical or commercial purposes
+- Remove or obscure any copyright or disclaimer notices
+- Use it without proper ethical approval
+
+## 9. Governing Law
+
+This License shall be governed by applicable research ethics guidelines and the laws of the jurisdiction where the research is conducted.
+
+## 10. Third-Party Components
+
+This Software includes third-party components subject to their own licenses:
+
+- **MediaPipe**: Apache License 2.0
+  - https://github.com/google/mediapipe
+
+- **OpenCV**: Apache License 2.0
+  - https://github.com/opencv/opencv
+
+- **scikit-learn**: BSD 3-Clause License
+  - https://github.com/scikit-learn/scikit-learn
+
+- **PyTorch**: BSD License
+  - https://github.com/pytorch/pytorch
+
+- **Streamlit**: Apache License 2.0
+  - https://github.com/streamlit/streamlit
+
+Compliance with these licenses is required.
+
+## 11. Acknowledgment
+
+By using this Software, you acknowledge:
+- This is a research prototype, not a validated medical device
+- Results may not be reliable or accurate
+- Professional medical evaluation is always required
+- You will not use this for clinical diagnosis or treatment decisions
+- You understand the limitations and will use it appropriately
+
+## 12. Citation
+
+If you use this Software in your research, please cite:
+
+```bibtex
+@software{asd_gaze_tool_2024,
+  title={ASD Gaze Detection Research Tool},
+  author={[Authors]},
+  year={2024},
+  url={[Repository URL]},
+  note={Research Use Only License}
+}
+```
+
+---
+
+**FINAL DISCLAIMER**
+
+⚠️ **This Software is for research purposes only and is NOT intended for clinical diagnosis or medical decision-making. Always consult qualified healthcare professionals for proper assessment and diagnosis of autism spectrum disorder.**
+
+By using this Software, you explicitly agree to these terms and take full responsibility for any use beyond research and educational purposes.
+
+Last Updated: January 2024
