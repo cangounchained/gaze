@@ -20,7 +20,8 @@ def gaze(frame, landmarks):
     try:
         # Iris landmark
         pupil = relative(landmarks.landmark[468], frame.shape)
-        cv2.circle(frame, pupil, 5, (255, 0, 0), -1)  # blue dot
+        cv2.circle(frame, pupil, 5, (255, 0, 0), -1)  # blue dot for pupil
+        cv2.circle(frame, pupil, 10, (0, 0, 255), 2)  # red circle for visibility and tracking
 
         # Eye regions
         left_eye_center = mid(

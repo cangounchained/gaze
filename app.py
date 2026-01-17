@@ -341,7 +341,7 @@ with tabs[0]:
                 if cap.isOpened():
                     ret, frame = cap.read()
                     if ret:
-                        st.image(frame, channels="BGR", caption="Live Webcam Feed", output_format="JPEG", clamp=True, use_column_width=True)
+                        st.image(frame, channels="BGR", caption="Live Webcam Feed", output_format="JPEG", clamp=True, width=640)
                     else:
                         st.error("⚠️ Unable to read from webcam.")
                     cap.release()
@@ -450,19 +450,26 @@ with tabs[2]:
 
             if st.button("Train Model"):
                 with st.spinner("Training model..."):
-                    # Assuming dataset has features and 'label' column
-                    if 'label' in df.columns:
-                    features = df.drop(columns=['label'])
+                    # Check if 'label' column exists
+                    label_col = 'label'
+                    if label_col not in df.columns:
+                        # Try to find a label column by looking for object/categorical columns
+                        for col in df.columns:
+                            if df[col].dtype == 'object':
+                                label_col = col
+                                break
+                    
+                    if label_col not in df.columns:
+                        st.error(f"Label column not found in dataset")
                     else:
-                    features = df
+                        features = df.drop(label_col, axis=1)
+                        labels = df[label_col].map({'ASD': 1, 'Typical': 0})
 
-                    labels = df['label'].map({'ASD': 1, 'Typical': 0})
+                        classifier = ASDClassifier('rf')
+                        classifier.train(features, labels)
+                        classifier.save_model("asd_model.pkl")
 
-                    classifier = ASDClassifier('rf')
-                    classifier.train(features, labels)
-                    classifier.save_model("asd_model.pkl")
-
-                    st.success("Model trained and saved!")
+                        st.success("Model trained and saved!")
 
 with tabs[3]:
     st.header("Session Results")

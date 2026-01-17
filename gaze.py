@@ -76,7 +76,9 @@ def gaze(frame, landmarks):
 
         final_gaze = left_pupil + (gaze_2d[0][0] - left_pupil) - (head_fix[0][0] - left_pupil)
 
-        # 🔴 Draw red line from pupil to gaze direction
+        # 🔴 Draw red dot at pupil center and red line to gaze direction
+        cv2.circle(frame, tuple(map(int, left_pupil)), 10, (0, 0, 255), -1)  # Red filled dot at pupil
+        cv2.circle(frame, tuple(map(int, left_pupil)), 12, (0, 0, 255), 2)   # Red outline for emphasis
         cv2.line(frame, tuple(map(int, left_pupil)), tuple(map(int, final_gaze)), (0, 0, 255), 2)
 
         # Determine which facial region the child is gazing at

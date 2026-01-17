@@ -107,7 +107,9 @@ while True:
 
     out.write(frame.copy())
     cv2.imshow("Autism Screening (Live)", frame)
-    if cv2.waitKey(1) & 0xFF == ord('q'):
+    # Use waitKey(30) to prevent camera from hanging, allowing ~30ms per frame
+    key = cv2.waitKey(30) & 0xFF
+    if key == ord('q'):
         print("Session ended.")
         break
 
