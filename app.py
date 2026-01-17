@@ -1,5 +1,4 @@
 import streamlit as st
-import subprocess
 import os
 import pandas as pd
 import tempfile
@@ -8,6 +7,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report
 import joblib
+import time
 
 # Conditional imports for optional dependencies
 try:
@@ -98,7 +98,7 @@ class ASDClassifier:
 
         if isinstance(features, dict):
             features = pd.DataFrame([features])
-
+        
         prediction = self.model.predict(features)[0]
         probabilities = self.model.predict_proba(features)[0]
 
@@ -106,6 +106,21 @@ class ASDClassifier:
         confidence = max(probabilities)
 
         return result, confidence
+    
+    def train(self, X, y):
+        """Train the model"""
+        self.model = RandomForestClassifier(n_estimators=100, random_state=42)
+        self.model.fit(X, y)
+    
+    def save_model(self, path):
+        """Save the trained model"""
+        if self.model is not None:
+            joblib.dump(self.model, path)
+    
+    def load_model(self, path):
+        """Load a saved model"""
+        if os.path.exists(path):
+            self.model = joblib.load(path)
 
     def evaluate(self, X_test, y_test, save_plots=False, output_dir='evaluation_results'):
         """Evaluate model performance"""
@@ -129,7 +144,6 @@ class ASDClassifier:
             print("\nClassification Report:")
             print(results['classification_report'])
 
-# Inline Feature Extraction Functions
 def extract_features_from_image(image_path):
     """Extract features from a single image"""
     # Placeholder - in real implementation would use MediaPipe/OpenCV
@@ -310,7 +324,7 @@ with tabs[0]:
     
     # Webcam preview section
     st.markdown("---")
-    st.header("📷 Preview Webcam (Optional)")
+    st.header("📷 Webcam Preview")
 
     if not CV2_AVAILABLE:
         st.error("❌ **Webcam functionality not available** - OpenCV is required")
@@ -318,72 +332,165 @@ with tabs[0]:
     else:
         if 'preview_active' not in st.session_state:
             st.session_state.preview_active = False
+            st.session_state.webcam_stream = None
 
-        def start_preview():
-            st.session_state.preview_active = True
-
-        def stop_preview():
-            st.session_state.preview_active = False
-
-        preview_col1, preview_col2 = st.columns([1, 3])
+        preview_col1, preview_col2 = st.columns(2)
 
         with preview_col1:
-            if not st.session_state.preview_active:
-                if st.button("▶️ Start Webcam Preview"):
-                    start_preview()
-            else:
-                if st.button("⏹️ Stop Webcam Preview"):
-                    stop_preview()
+            if st.button("▶️ Start Webcam", key="start_webcam"):
+                st.session_state.preview_active = True
+            if st.button("⏹️ Stop Webcam", key="stop_webcam"):
+                st.session_state.preview_active = False
+                st.session_state.webcam_stream = None
 
-        with preview_col2:
-            if st.session_state.preview_active:
-                cap = cv2.VideoCapture(0)
-                if cap.isOpened():
+        if st.session_state.preview_active:
+            cap = cv2.VideoCapture(0)
+            if not cap.isOpened():
+                st.error("⚠️ Webcam not detected or unavailable.")
+            else:
+                frame_placeholder = st.empty()
+                info_placeholder = st.empty()
+                
+                frame_count = 0
+                while st.session_state.preview_active and frame_count < 300:
                     ret, frame = cap.read()
-                    if ret:
-                        st.image(frame, channels="BGR", caption="Live Webcam Feed", output_format="JPEG", clamp=True, width=640)
-                    else:
+                    if not ret:
                         st.error("⚠️ Unable to read from webcam.")
-                    cap.release()
-                else:
-                    st.error("⚠️ Webcam not detected or unavailable.")
+                        break
+                    
+                    # Draw red dot at center (following cursor)
+                    h, w = frame.shape[:2]
+                    center_x, center_y = w // 2, h // 2
+                    cv2.circle(frame, (center_x, center_y), 15, (0, 0, 255), -1)
+                    cv2.circle(frame, (center_x, center_y), 17, (0, 0, 255), 2)
+                    
+                    # Convert BGR to RGB for display
+                    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    frame_placeholder.image(rgb_frame, channels="RGB", width=640)
+                    
+                    frame_count += 1
+                    info_placeholder.text(f"Frame: {frame_count} | Resolution: {w}x{h}")
+                
+                cap.release()
     
     # Calibration section
     st.markdown("---")
-    st.header("🎯 Calibration (Optional)")
+    st.header("🎯 Calibration")
     
-    st.write("Calibrate your gaze by following the moving dot with your eyes. This helps improve analysis accuracy.")
+    st.write("Calibrate your gaze by following the moving red dot with your eyes.")
     
-    if st.button("Start Calibration"):
+    if st.button("Start Calibration", key="calibrate_btn"):
+        st.info("Follow the red dot with your eyes...")
+        
+        # Create a placeholder for the calibration display
         calibration_placeholder = st.empty()
-        import time
-        positions = [(50, 50), (50, 150), (150, 50), (150, 150), (100, 100)]  # example positions
-        for pos in positions:
-            calibration_placeholder.markdown(f"""
-            <div style="position: relative; width: 200px; height: 200px; border: 1px solid black; margin: 0 auto;">
-                <div style="position: absolute; left: {pos[0]}px; top: {pos[1]}px; width: 10px; height: 10px; background-color: red; border-radius: 50%;"></div>
-            </div>
-            <p style="text-align: center;">Look at the red dot</p>
-            """, unsafe_allow_html=True)
-            time.sleep(2)  # wait 2 seconds
+        
+        # Define calibration positions
+        positions = [
+            (640 // 4, 480 // 4),
+            (3 * 640 // 4, 480 // 4),
+            (640 // 4, 3 * 480 // 4),
+            (3 * 640 // 4, 3 * 480 // 4),
+            (640 // 2, 480 // 2)
+        ]
+        
+        # Create frames for each position
+        for pos_idx, (pos_x, pos_y) in enumerate(positions):
+            # Create a blank image with a red dot
+            calibration_frame = np.ones((480, 640, 3), dtype=np.uint8) * 200  # Light gray background
+            cv2.circle(calibration_frame, (pos_x, pos_y), 30, (0, 0, 255), -1)  # Red filled circle
+            cv2.circle(calibration_frame, (pos_x, pos_y), 35, (0, 0, 255), 3)  # Red outline
+            
+            # Display the frame
+            calibration_placeholder.image(calibration_frame, channels="BGR", width=640)
+            
+            # Display instruction
+            st.text(f"Position {pos_idx + 1}/5 - Look at the red dot for 2 seconds...")
+            time.sleep(2)
+        
         calibration_placeholder.empty()
-        st.success("Calibration complete!")
+        st.success("✅ Calibration complete!")
     
     # Gaze Tracking button
     st.markdown("---")
-    st.header("▶️ Run Gaze Tracking")
+    st.header("▶️ Run Live Gaze Tracking")
 
-    if not CV2_AVAILABLE:
-        st.error("❌ **Live gaze tracking not available** - Requires OpenCV")
+    if not CV2_AVAILABLE or not MEDIAPIPE_AVAILABLE:
+        st.error("❌ **Live gaze tracking not available** - Requires OpenCV and MediaPipe")
         st.info("Install dependencies: `pip install opencv-python mediapipe`")
     else:
-        if st.button("Start Live Session"):
+        if st.button("Start Live Gaze Session", key="start_gaze"):
             if not user_id.strip():
                 st.error("⚠️ Student/Patient ID is required before starting.")
             else:
-                with st.spinner(f"Starting gaze tracking session for **{user_id}**... Please ensure your webcam is on."):
-                    subprocess.run(["python", "main.py"])
-                st.success("Session complete! Check results in the Results tab.")
+                st.info(f"Starting gaze tracking session for **{user_id}**...")
+                st.info("🔴 Following your gaze in real-time...")
+                
+                try:
+                    cap = cv2.VideoCapture(0)
+                    if not cap.isOpened():
+                        st.error("⚠️ Webcam not accessible.")
+                    else:
+                        mp_face_mesh = mp.solutions.face_mesh
+                        face_mesh = mp_face_mesh.FaceMesh(
+                            static_image_mode=False,
+                            max_num_faces=1,
+                            refine_landmarks=True
+                        )
+                        
+                        frame_placeholder = st.empty()
+                        status_placeholder = st.empty()
+                        session_duration = st.empty()
+                        
+                        session_start = time.time()
+                        frame_count = 0
+                        max_frames = 150  # ~5 seconds at 30fps
+                        
+                        while frame_count < max_frames:
+                            ret, frame = cap.read()
+                            if not ret:
+                                st.error("⚠️ Failed to read from webcam.")
+                                break
+                            
+                            h, w = frame.shape[:2]
+                            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                            results = face_mesh.process(rgb)
+                            
+                            if results.multi_face_landmarks:
+                                for landmarks in results.multi_face_landmarks:
+                                    # Get iris/pupil landmark
+                                    pupil = landmarks.landmark[468]
+                                    pupil_x = int(pupil.x * w)
+                                    pupil_y = int(pupil.y * h)
+                                    
+                                    # Draw red dot at pupil
+                                    cv2.circle(frame, (pupil_x, pupil_y), 10, (0, 0, 255), -1)
+                                    cv2.circle(frame, (pupil_x, pupil_y), 12, (0, 0, 255), 2)
+                                    
+                                    # Draw a line from left eye to gaze direction
+                                    left_eye = landmarks.landmark[33]
+                                    left_eye_x = int(left_eye.x * w)
+                                    left_eye_y = int(left_eye.y * h)
+                                    cv2.line(frame, (left_eye_x, left_eye_y), (pupil_x, pupil_y), (0, 0, 255), 2)
+                                    
+                                    status_placeholder.text(f"👁️ Tracking pupil at ({pupil_x}, {pupil_y})")
+                            
+                            # Convert and display frame
+                            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                            frame_placeholder.image(rgb_frame, channels="RGB", width=640)
+                            
+                            elapsed = time.time() - session_start
+                            session_duration.text(f"⏱️ Session Duration: {elapsed:.1f}s")
+                            
+                            frame_count += 1
+                        
+                        cap.release()
+                        face_mesh.close()
+                        st.success("✅ Gaze tracking session complete!")
+                        st.info("Results saved - check the 'Results' tab for detailed analysis.")
+                
+                except Exception as e:
+                    st.error(f"❌ Error during gaze tracking: {str(e)}")
 
 with tabs[1]:
     st.header("Upload & Analyze Media")
