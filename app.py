@@ -7,86 +7,26 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report
 import joblib
 import time
-import cv2
-import mediapipe as mp
-from helpers import log_fixation_data, get_fixation_stats
 
-# ===========================
-# CONFIGURATION & SETUP
-# ===========================
+# Properly handle optional dependencies
+try:
+    import cv2
+    CV2_AVAILABLE = True
+except ImportError:
+    CV2_AVAILABLE = False
 
-# Page configuration
+try:
+    import mediapipe as mp
+    MEDIAPIPE_AVAILABLE = True
+except ImportError:
+    MEDIAPIPE_AVAILABLE = False
+
+# Page config
 st.set_page_config(
     page_title="🧠 ASD Gaze Tracker",
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
-# Custom CSS styling
-st.markdown("""
-<style>
-    .stApp {
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        background: #f9fafb;
-    }
-    .stButton>button {
-        background-color: #0072B5;
-        color: white;
-        font-weight: bold;
-        border-radius: 8px;
-        padding: 10px 20px;
-        transition: background-color 0.3s ease;
-    }
-    .stButton>button:hover {
-        background-color: #005f86;
-    }
-    .stDownloadButton>button {
-        background-color: #28a745;
-        color: white;
-        font-weight: bold;
-        border-radius: 8px;
-        padding: 10px 20px;
-    }
-    .stDownloadButton>button:hover {
-        background-color: #1e7e34;
-    }
-    .success-box {
-        padding: 15px;
-        border-radius: 8px;
-        background-color: #d4edda;
-        border: 1px solid #c3e6cb;
-        color: #155724;
-    }
-    .error-box {
-        padding: 15px;
-        border-radius: 8px;
-        background-color: #f8d7da;
-        border: 1px solid #f5c6cb;
-        color: #721c24;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# ===========================
-# DEPENDENCY CHECKS
-# ===========================
-
-dependencies_available = {
-    'cv2': False,
-    'mediapipe': False
-}
-
-try:
-    import cv2
-    dependencies_available['cv2'] = True
-except ImportError:
-    st.error("❌ OpenCV not installed. Install with: `pip install opencv-python`")
-
-try:
-    import mediapipe as mp
-    dependencies_available['mediapipe'] = True
-except ImportError:
-    st.error("❌ MediaPipe not installed. Install with: `pip install mediapipe`")
 
 # ===========================
 # ASD CLASSIFIER CLASS
@@ -105,11 +45,11 @@ class ASDClassifier:
         """Train the model"""
         try:
             self.feature_names = X.columns.tolist() if hasattr(X, 'columns') else None
-            self.model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
+            self.model = RandomForestClassifier(n_estimators=100, random_state=42)
             self.model.fit(X, y)
             return True
         except Exception as e:
-            st.error(f"Training error: {str(e)}")
+            st.error(f"❌ Training error: {str(e)}")
             return False
     
     def predict(self, features):
@@ -120,6 +60,8 @@ class ASDClassifier:
         try:
             if isinstance(features, dict):
                 features = pd.DataFrame([features])
+            elif isinstance(features, pd.DataFrame):
+                pass
             
             prediction = self.model.predict(features)[0]
             probabilities = self.model.predict_proba(features)[0]
@@ -128,7 +70,7 @@ class ASDClassifier:
             result = 'ASD' if prediction == 1 else 'Typical'
             return result, confidence
         except Exception as e:
-            st.error(f"Prediction error: {str(e)}")
+            st.error(f"❌ Prediction error: {str(e)}")
             return "Error", 0.0
     
     def save_model(self, path):
@@ -142,7 +84,7 @@ class ASDClassifier:
                 }, path)
                 return True
         except Exception as e:
-            st.error(f"Save error: {str(e)}")
+            st.error(f"❌ Save error: {str(e)}")
             return False
     
     def load_model(self, path):
@@ -155,126 +97,49 @@ class ASDClassifier:
                 self.label_mapping = data.get('label_mapping')
                 return True
         except Exception as e:
-            st.error(f"Load error: {str(e)}")
-            return False
+            st.error(f"❌ Load error: {str(e)}")
         return False
-
-# ===========================
-# HELPER FUNCTIONS
-# ===========================
-
-def extract_features_from_frame(frame, landmarks):
-    """Extract gaze features from a frame and MediaPipe landmarks"""
-    try:
-        h, w = frame.shape[:2]
-        
-        # Get pupil position
-        pupil = landmarks.landmark[468]
-        pupil_x = pupil.x * w
-        pupil_y = pupil.y * h
-        
-        # Get eye positions
-        left_eye = landmarks.landmark[33]
-        right_eye = landmarks.landmark[263]
-        left_eye_x = left_eye.x * w
-        left_eye_y = left_eye.y * h
-        right_eye_x = right_eye.x * w
-        right_eye_y = right_eye.y * h
-        
-        # Get mouth and nose
-        mouth = landmarks.landmark[13]
-        nose = landmarks.landmark[1]
-        
-        features = {
-            'x': pupil_x,
-            'y': pupil_y,
-            'pupil_left_x': left_eye_x,
-            'pupil_left_y': left_eye_y,
-            'pupil_right_x': right_eye_x,
-            'pupil_right_y': right_eye_y,
-            'mouth_x': mouth.x * w,
-            'mouth_y': mouth.y * h,
-            'nose_x': nose.x * w,
-            'nose_y': nose.y * h,
-            'dist_eye_left': np.sqrt((pupil_x - left_eye_x)**2 + (pupil_y - left_eye_y)**2),
-            'dist_eye_right': np.sqrt((pupil_x - right_eye_x)**2 + (pupil_y - right_eye_y)**2)
-        }
-        
-        return features
-    except Exception as e:
-        st.error(f"Feature extraction error: {str(e)}")
-        return None
-
-def draw_gaze_visualization(frame, landmarks, w, h):
-    """Draw gaze visualization on frame"""
-    try:
-        # Pupil landmark
-        pupil = landmarks.landmark[468]
-        pupil_x = int(pupil.x * w)
-        pupil_y = int(pupil.y * h)
-        
-        # Draw red circle at pupil
-        cv2.circle(frame, (pupil_x, pupil_y), 10, (0, 0, 255), -1)
-        cv2.circle(frame, (pupil_x, pupil_y), 12, (0, 0, 255), 2)
-        
-        # Eye positions
-        left_eye = landmarks.landmark[33]
-        left_eye_x = int(left_eye.x * w)
-        left_eye_y = int(left_eye.y * h)
-        
-        # Draw line from eye to gaze point
-        cv2.line(frame, (left_eye_x, left_eye_y), (pupil_x, pupil_y), (0, 0, 255), 2)
-        
-        return frame
-    except Exception as e:
-        return frame
 
 # ===========================
 # SIDEBAR
 # ===========================
 
 with st.sidebar:
-    st.header("🧠 About This App")
-    st.markdown("""
-    **ASD Gaze Tracker** is a tool for early screening of Autism Spectrum Disorder 
-    through gaze pattern analysis.
+    st.header("🧠 About")
+    st.write("""
+    **ASD Gaze Tracker** - Real-time gaze analysis for autism spectrum disorder screening.
     
     **Features:**
-    - 📷 Real-time webcam gaze tracking
-    - 🎯 Calibration for improved accuracy
-    - 📊 Gaze behavior analysis
-    - 🤖 ML-based risk assessment
-    
-    **How to use:**
-    1. Calibrate your gaze
-    2. Start a tracking session
-    3. View results and analysis
-    
-    > All data is processed locally. No data is sent to servers.
+    - 📷 Webcam gaze tracking
+    - 🎯 Calibration
+    - 📊 Analysis
+    - 🤖 ML Models
     """)
     
     st.markdown("---")
-    
-    # Settings
     st.subheader("⚙️ Settings")
-    session_duration = st.slider("Session Duration (seconds)", 5, 60, 10)
-    st.caption(f"Session will run for {session_duration} seconds")
+    session_duration = st.slider("Session Duration (seconds)", 5, 60, 15)
 
 # ===========================
-# MAIN CONTENT
+# MAIN PAGE
 # ===========================
 
 st.title("🧠 ASD Gaze Tracker")
-st.write("Real-time gaze analysis for autism spectrum disorder screening")
 
 # Check dependencies
-if not all(dependencies_available.values()):
-    st.error("⚠️ Required dependencies missing. Please install: `pip install opencv-python mediapipe`")
-    st.stop()
+if not CV2_AVAILABLE:
+    st.error("❌ OpenCV not installed. Install with: pip install opencv-python")
+    
+if not MEDIAPIPE_AVAILABLE:
+    st.error("❌ MediaPipe not installed. Install with: pip install mediapipe")
 
-st.success("✅ All dependencies available")
+if CV2_AVAILABLE and MEDIAPIPE_AVAILABLE:
+    st.success("✅ All dependencies available")
 
-# Tabs
+# ===========================
+# TABS
+# ===========================
+
 tab1, tab2, tab3, tab4 = st.tabs(["🎯 Live Session", "📹 Upload & Analyze", "🤖 Train Model", "📊 Results"])
 
 # ===========================
@@ -285,113 +150,109 @@ with tab1:
     st.header("Live Gaze Tracking Session")
     
     col1, col2 = st.columns(2)
-    
     with col1:
-        user_id = st.text_input(
-            "👤 Participant ID",
-            placeholder="e.g., STU001",
-            help="Unique identifier for this session"
-        )
-    
+        user_id = st.text_input("Participant ID", placeholder="e.g., STU001")
     with col2:
-        session_notes = st.text_area(
-            "📝 Session Notes",
-            placeholder="Optional notes about this session",
-            height=50
-        )
+        session_notes = st.text_area("Notes", placeholder="Optional", height=50)
     
     st.markdown("---")
-    
-    # Webcam preview
     st.subheader("📷 Webcam Preview")
+    
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("▶️ Start Webcam Preview", key="preview_start"):
-            st.session_state.preview_running = True
+        if st.button("▶️ Start Preview", key="preview_start"):
+            st.session_state.preview_active = True
     
     with col2:
         if st.button("⏹️ Stop Preview", key="preview_stop"):
-            st.session_state.preview_running = False
+            st.session_state.preview_active = False
     
-    if st.session_state.get('preview_running', False):
-        cap = cv2.VideoCapture(0)
-        if cap.isOpened():
-            frame_placeholder = st.empty()
-            info_placeholder = st.empty()
+    # Webcam preview
+    if st.session_state.get('preview_active', False):
+        if not CV2_AVAILABLE:
+            st.error("OpenCV not available")
+        else:
+            st.info("Starting webcam...")
+            cap = cv2.VideoCapture(0)
             
-            frame_count = 0
-            max_preview_frames = 150
-            
-            while st.session_state.get('preview_running', False) and frame_count < max_preview_frames:
-                ret, frame = cap.read()
-                if not ret:
-                    st.error("Unable to read from webcam")
-                    break
+            if not cap.isOpened():
+                st.error("❌ Cannot access webcam. Make sure it's connected and not in use.")
+            else:
+                frame_placeholder = st.empty()
+                info_placeholder = st.empty()
                 
-                h, w = frame.shape[:2]
+                frame_count = 0
+                while st.session_state.get('preview_active', False) and frame_count < 300:
+                    ret, frame = cap.read()
+                    if not ret:
+                        st.error("Cannot read from webcam")
+                        break
+                    
+                    h, w = frame.shape[:2]
+                    
+                    # Draw red dot at center
+                    cv2.circle(frame, (w//2, h//2), 15, (0, 0, 255), -1)
+                    cv2.circle(frame, (w//2, h//2), 17, (0, 0, 255), 2)
+                    
+                    # Display
+                    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    frame_placeholder.image(rgb_frame, channels="RGB", width=640)
+                    frame_count += 1
+                    info_placeholder.text(f"Frame: {frame_count} | {w}x{h}")
+                    
+                    time.sleep(0.01)  # Small delay to prevent CPU overload
                 
-                # Draw center red dot
-                cv2.circle(frame, (w//2, h//2), 15, (0, 0, 255), -1)
-                cv2.circle(frame, (w//2, h//2), 17, (0, 0, 255), 2)
-                
-                # Display
-                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                frame_placeholder.image(rgb_frame, channels="RGB", width=640)
-                
-                frame_count += 1
-                info_placeholder.text(f"Frame: {frame_count} | Resolution: {w}x{h}")
-            
-            cap.release()
-            frame_placeholder.empty()
+                cap.release()
+                st.session_state.preview_active = False
     
     st.markdown("---")
-    
-    # Calibration
     st.subheader("🎯 Calibration")
     
-    if st.button("Start 5-Point Calibration"):
-        st.info("Follow the red dot with your eyes. This helps improve accuracy.")
-        
-        placeholder = st.empty()
-        positions = [
-            (640//4, 480//4, "Top-Left"),
-            (3*640//4, 480//4, "Top-Right"),
-            (640//4, 3*480//4, "Bottom-Left"),
-            (3*640//4, 3*480//4, "Bottom-Right"),
-            (640//2, 480//2, "Center")
-        ]
-        
-        for idx, (x, y, label) in enumerate(positions):
-            # Create calibration frame
-            cal_frame = np.ones((480, 640, 3), dtype=np.uint8) * 180
-            cv2.circle(cal_frame, (x, y), 30, (0, 0, 255), -1)
-            cv2.circle(cal_frame, (x, y), 35, (0, 0, 255), 3)
+    if st.button("Start 5-Point Calibration", key="calibrate"):
+        if not CV2_AVAILABLE:
+            st.error("OpenCV not available")
+        else:
+            st.info("Follow the red dot with your eyes")
+            placeholder = st.empty()
             
-            placeholder.image(cal_frame, channels="BGR", width=640)
-            st.text(f"Position {idx+1}/5: {label} - Hold for 2 seconds...")
-            time.sleep(2)
-        
-        placeholder.empty()
-        st.success("✅ Calibration complete!")
+            positions = [
+                (160, 120, "Top-Left"),
+                (480, 120, "Top-Right"),
+                (160, 360, "Bottom-Left"),
+                (480, 360, "Bottom-Right"),
+                (320, 240, "Center")
+            ]
+            
+            for idx, (x, y, label) in enumerate(positions):
+                # Create calibration frame
+                cal_frame = np.ones((480, 640, 3), dtype=np.uint8) * 180
+                cv2.circle(cal_frame, (x, y), 30, (0, 0, 255), -1)
+                cv2.circle(cal_frame, (x, y), 35, (0, 0, 255), 3)
+                
+                placeholder.image(cal_frame, channels="BGR", width=640)
+                st.text(f"{idx+1}/5: {label} - Focus for 2 seconds...")
+                time.sleep(2)
+            
+            placeholder.empty()
+            st.success("✅ Calibration complete!")
     
     st.markdown("---")
-    
-    # Gaze tracking
     st.subheader("▶️ Start Gaze Tracking")
     
-    if st.button("🔴 Start Tracking Session", key="start_tracking"):
+    if st.button("🔴 Start Tracking", key="start_tracking"):
         if not user_id.strip():
-            st.error("❌ Please enter a Participant ID")
+            st.error("❌ Enter Participant ID first")
+        elif not CV2_AVAILABLE or not MEDIAPIPE_AVAILABLE:
+            st.error("❌ OpenCV and MediaPipe required")
         else:
             st.info(f"Starting session for {user_id}...")
             
             try:
                 cap = cv2.VideoCapture(0)
                 if not cap.isOpened():
-                    st.error("Cannot access webcam")
+                    st.error("❌ Cannot access webcam")
                 else:
-                    # Initialize MediaPipe
                     mp_face_mesh = mp.solutions.face_mesh
                     face_mesh = mp_face_mesh.FaceMesh(
                         static_image_mode=False,
@@ -400,17 +261,14 @@ with tab1:
                         min_detection_confidence=0.5
                     )
                     
-                    # Create placeholders
                     video_placeholder = st.empty()
                     timer_placeholder = st.empty()
                     status_placeholder = st.empty()
                     
-                    # Tracking data
                     session_start = time.time()
                     frame_count = 0
-                    gaze_targets = []
+                    gaze_data = []
                     
-                    # Run tracking
                     while time.time() - session_start < session_duration:
                         ret, frame = cap.read()
                         if not ret:
@@ -421,18 +279,32 @@ with tab1:
                         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                         results = face_mesh.process(rgb)
                         
-                        # Process faces
                         face_detected = False
                         if results.multi_face_landmarks:
                             face_detected = True
                             for landmarks in results.multi_face_landmarks:
-                                # Draw visualization
-                                frame = draw_gaze_visualization(frame, landmarks, w, h)
+                                # Get pupil
+                                pupil = landmarks.landmark[468]
+                                pupil_x = int(pupil.x * w)
+                                pupil_y = int(pupil.y * h)
                                 
-                                # Extract and log features
-                                features = extract_features_from_frame(frame, landmarks)
-                                if features:
-                                    gaze_targets.append(features)
+                                # Draw red dot at pupil
+                                cv2.circle(frame, (pupil_x, pupil_y), 10, (0, 0, 255), -1)
+                                cv2.circle(frame, (pupil_x, pupil_y), 12, (0, 0, 255), 2)
+                                
+                                # Draw line from eye
+                                left_eye = landmarks.landmark[33]
+                                left_eye_x = int(left_eye.x * w)
+                                left_eye_y = int(left_eye.y * h)
+                                cv2.line(frame, (left_eye_x, left_eye_y), (pupil_x, pupil_y), (0, 0, 255), 2)
+                                
+                                # Store gaze data
+                                gaze_data.append({
+                                    'frame': frame_count,
+                                    'x': pupil_x,
+                                    'y': pupil_y,
+                                    'timestamp': time.time() - session_start
+                                })
                         
                         # Display frame
                         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -441,32 +313,28 @@ with tab1:
                         # Update timer
                         elapsed = time.time() - session_start
                         remaining = session_duration - elapsed
-                        timer_placeholder.metric(
-                            "Time Remaining",
-                            f"{remaining:.1f}s",
-                            delta=f"{elapsed:.1f}s elapsed"
-                        )
+                        timer_placeholder.metric("Time Remaining", f"{remaining:.1f}s")
                         
                         # Status
-                        status_text = "✅ Face detected" if face_detected else "❌ No face detected"
+                        status_text = "✅ Face detected" if face_detected else "❌ No face"
                         status_placeholder.text(f"{status_text} | Frames: {frame_count}")
                         
                         frame_count += 1
+                        time.sleep(0.01)
                     
-                    # Cleanup
                     cap.release()
                     face_mesh.close()
                     
-                    # Save session data
+                    # Save session
                     st.session_state.last_session = {
                         'user_id': user_id,
                         'duration': session_duration,
                         'frames': frame_count,
-                        'gaze_data': gaze_targets,
+                        'gaze_data': gaze_data,
                         'notes': session_notes
                     }
                     
-                    st.success("✅ Tracking session complete!")
+                    st.success("✅ Tracking complete!")
                     st.balloons()
                     
             except Exception as e:
@@ -479,38 +347,29 @@ with tab1:
 with tab2:
     st.header("Upload & Analyze Media")
     
-    uploaded_file = st.file_uploader(
-        "Upload image or video",
-        type=["jpg", "jpeg", "png", "mp4", "avi", "mov"]
-    )
+    uploaded_file = st.file_uploader("Upload image or video", type=["jpg", "jpeg", "png", "mp4", "avi", "mov"])
     
     if uploaded_file:
-        # Display media
         if uploaded_file.type.startswith('image'):
-            st.image(uploaded_file, use_column_width=True)
+            st.image(uploaded_file, width=640)
         else:
             st.video(uploaded_file)
         
-        if st.button("🔍 Analyze Media"):
+        if st.button("🔍 Analyze"):
             with st.spinner("Analyzing..."):
-                # Simulate feature extraction
                 features = {
-                    'eye_contact': np.random.uniform(0.3, 0.9),
-                    'gaze_stability': np.random.uniform(0.4, 0.95),
-                    'fixation_duration': np.random.uniform(0.5, 3.0),
-                    'saccade_frequency': np.random.randint(2, 15)
+                    'eye_contact': round(np.random.uniform(0.3, 0.9), 2),
+                    'gaze_stability': round(np.random.uniform(0.4, 0.95), 2),
+                    'fixation_duration': round(np.random.uniform(0.5, 3.0), 2),
                 }
                 
                 st.success("✅ Analysis complete!")
-                
                 col1, col2 = st.columns(2)
                 with col1:
-                    st.metric("Eye Contact", f"{features['eye_contact']:.2%}")
-                    st.metric("Gaze Stability", f"{features['gaze_stability']:.2%}")
-                
+                    st.metric("Eye Contact", f"{features['eye_contact']:.0%}")
+                    st.metric("Gaze Stability", f"{features['gaze_stability']:.0%}")
                 with col2:
                     st.metric("Avg Fixation", f"{features['fixation_duration']:.2f}s")
-                    st.metric("Saccades/min", features['saccade_frequency'])
 
 # ===========================
 # TAB 3: TRAIN MODEL
@@ -519,57 +378,75 @@ with tab2:
 with tab3:
     st.header("Train Custom Model")
     
-    dataset_file = st.file_uploader("Upload training dataset (CSV)", type=["csv"])
+    dataset_file = st.file_uploader("Upload training CSV", type=["csv"])
     
-    if dataset_file:
-        df = pd.read_csv(dataset_file)
-        st.dataframe(df.head(), use_container_width=True)
-        
-        st.subheader("Select Label Column")
-        
-        # Find categorical columns
-        label_candidates = [col for col in df.columns 
-                           if df[col].dtype == 'object' or df[col].nunique() <= 10]
-        
-        if not label_candidates:
-            label_candidates = df.columns.tolist()
-        
-        label_col = st.selectbox("Label column:", label_candidates)
-        
-        if st.button("🚀 Train Model"):
-            try:
-                with st.spinner("Training..."):
-                    # Prepare data
-                    df_clean = df.dropna()
+    if dataset_file is not None:
+        try:
+            df = pd.read_csv(dataset_file)
+            st.write(f"✅ Loaded {len(df)} rows, {len(df.columns)} columns")
+            st.dataframe(df.head(5), use_column_width=True)
+            
+            st.subheader("Select Label Column")
+            st.info("Choose column with class labels (ASD/Typical or 0/1)")
+            
+            # Find categorical columns
+            label_candidates = [col for col in df.columns 
+                              if df[col].dtype == 'object' or (df[col].dtype != 'object' and df[col].nunique() <= 10)]
+            
+            if not label_candidates:
+                label_candidates = list(df.columns)
+            
+            label_col = st.selectbox("Label column:", label_candidates)
+            st.write(f"Unique labels: {df[label_col].unique().tolist()}")
+            
+            if st.button("🚀 Train Model"):
+                try:
+                    with st.spinner("Training..."):
+                        # Prepare data
+                        df_clean = df.dropna(subset=[label_col])
+                        
+                        if len(df_clean) == 0:
+                            st.error("❌ No valid data after removing empty rows")
+                        else:
+                            X = df_clean.drop(columns=[label_col])
+                            y_raw = df_clean[label_col]
+                            
+                            st.write(f"Training on {len(X)} samples with {len(X.columns)} features")
+                            
+                            # Encode labels
+                            if y_raw.dtype == 'object':
+                                label_map = {v: i for i, v in enumerate(y_raw.unique())}
+                                st.write(f"Label mapping: {label_map}")
+                                y = y_raw.map(label_map)
+                            else:
+                                y = y_raw.astype(int)
+                                label_map = None
+                            
+                            # Train model
+                            classifier = ASDClassifier()
+                            classifier.label_mapping = label_map
+                            
+                            if classifier.train(X, y):
+                                if classifier.save_model("asd_model.pkl"):
+                                    st.success("✅ Model trained and saved!")
+                                    st.info(f"Samples: {len(X)} | Features: {len(X.columns)}")
+                                else:
+                                    st.error("❌ Failed to save model")
+                            else:
+                                st.error("❌ Training failed")
+                            
+                except Exception as e:
+                    st.error(f"❌ Error: {str(e)}")
                     
-                    X = df_clean.drop(columns=[label_col])
-                    y_raw = df_clean[label_col]
-                    
-                    # Encode labels
-                    if y_raw.dtype == 'object':
-                        label_map = {v: i for i, v in enumerate(y_raw.unique())}
-                        y = y_raw.map(label_map)
-                    else:
-                        y = y_raw
-                    
-                    # Train
-                    classifier = ASDClassifier()
-                    classifier.label_mapping = label_map if y_raw.dtype == 'object' else None
-                    classifier.train(X, y)
-                    classifier.save_model("asd_model.pkl")
-                    
-                    st.success("✅ Model trained successfully!")
-                    st.info(f"Samples: {len(X)} | Features: {len(X.columns)}")
-                    
-            except Exception as e:
-                st.error(f"❌ Training failed: {str(e)}")
+        except Exception as e:
+            st.error(f"❌ Error loading CSV: {str(e)}")
 
 # ===========================
 # TAB 4: RESULTS
 # ===========================
 
 with tab4:
-    st.header("Session Results & Analytics")
+    st.header("Session Results")
     
     if 'last_session' in st.session_state:
         session = st.session_state.last_session
@@ -580,30 +457,27 @@ with tab4:
         with col2:
             st.metric("Duration", f"{session['duration']}s")
         with col3:
-            st.metric("Frames Captured", session['frames'])
+            st.metric("Frames", session['frames'])
         
         if session.get('notes'):
-            st.info(f"📝 Notes: {session['notes']}")
+            st.info(f"Notes: {session['notes']}")
         
         st.markdown("---")
         
-        # Gaze data visualization
         if session['gaze_data']:
             gaze_df = pd.DataFrame(session['gaze_data'])
-            st.subheader("Gaze Data")
-            st.dataframe(gaze_df, use_container_width=True)
+            st.write("Gaze Data:")
+            st.dataframe(gaze_df, use_column_width=True)
             
-            # Simple statistics
             col1, col2 = st.columns(2)
             with col1:
-                st.metric("Avg X Position", f"{gaze_df['x'].mean():.1f}px")
-                st.metric("Avg Y Position", f"{gaze_df['y'].mean():.1f}px")
+                st.metric("Avg X", f"{gaze_df['x'].mean():.0f}px")
+                st.metric("Avg Y", f"{gaze_df['y'].mean():.0f}px")
             with col2:
-                st.metric("X Std Dev", f"{gaze_df['x'].std():.1f}px")
-                st.metric("Y Std Dev", f"{gaze_df['y'].std():.1f}px")
+                st.metric("X Range", f"{gaze_df['x'].max() - gaze_df['x'].min():.0f}px")
+                st.metric("Y Range", f"{gaze_df['y'].max() - gaze_df['y'].min():.0f}px")
     else:
-        st.info("No session data available. Run a tracking session first.")
+        st.info("No session data. Run a tracking session first.")
 
-# Footer
 st.markdown("---")
-st.caption("🧠 ASD Gaze Tracker | Privacy-focused | Fully offline | © 2025 ASD Research Initiative")
+st.caption("🧠 ASD Gaze Tracker | Privacy-focused | Offline only")
